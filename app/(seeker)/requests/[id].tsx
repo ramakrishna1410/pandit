@@ -7,6 +7,7 @@ import { StatusBadge } from '../../../src/components/StatusBadge';
 import { Button } from '../../../src/components/Button';
 import { RatingStars } from '../../../src/components/RatingStars';
 import { TextField } from '../../../src/components/TextField';
+import { payCommission, PaymentCancelledError } from '../../../src/lib/payments';
 import { colors, radius, spacing } from '../../../src/constants/theme';
 import type { BookingRequest, CeremonyType, Rating } from '../../../src/types/database';
 
@@ -16,7 +17,7 @@ type PanditContact = { id: string; full_name: string | null; phone: string | nul
 export default function SeekerRequestDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [pandit, setPandit] = useState<PanditContact | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -102,27 +103,26 @@ export default function SeekerRequestDetailScreen() {
     ]);
   };
 
-  // Creates the commission payment record and would hand off to Razorpay
-  // checkout. Real gateway integration (and the webhook that calls
-  // confirm_request_payment to flip quoted -> confirmed) is a follow-up —
-  // this wires the DB side of the flow so that piece can be dropped in.
   const acceptQuoteAndPay = async () => {
-    if (!session || !request) return;
+    if (!session || !request || !profile) return;
     setPaying(true);
-    const { error } = await supabase.from('payments').insert({
-      request_id: request.id,
-      seeker_id: session.user.id,
-      amount: request.commission_amount ?? 0,
-    });
-    setPaying(false);
-    if (error) {
-      Alert.alert('Could not start payment', error.message);
-      return;
+    try {
+      await payCommission({
+        requestId: request.id,
+        seekerName: profile.full_name ?? '',
+        seekerPhone: profile.phone ?? '',
+      });
+      // The Realtime subscription above will pick up the resulting
+      // quoted -> confirmed transition and refresh the screen, but reload
+      // immediately too in case that event is slow to arrive.
+      await load();
+    } catch (err) {
+      if (!(err instanceof PaymentCancelledError)) {
+        Alert.alert('Payment failed', err instanceof Error ? err.message : 'Please try again.');
+      }
+    } finally {
+      setPaying(false);
     }
-    Alert.alert(
-      'Payment integration pending',
-      'Razorpay checkout isn’t wired up yet — this is where you’d pay the commission to confirm the booking.'
-    );
   };
 
   if (!request) {

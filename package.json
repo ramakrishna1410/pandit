@@ -20,6 +20,7 @@
     "react": "19.2.3",
     "react-hook-form": "^7.84.0",
     "react-native": "0.86.2",
+    "react-native-razorpay": "^3.0.0",
     "react-native-safe-area-context": "^5.8.1",
     "react-native-screens": "^4.26.2",
     "react-native-url-polyfill": "^4.0.0",
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "@types/react-native-razorpay": "^2.2.6",
     "typescript": "~6.0.3"
   },
   "scripts": {
