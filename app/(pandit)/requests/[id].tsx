@@ -5,8 +5,9 @@ import { supabase } from '../../../src/lib/supabase';
 import { useAuth } from '../../../src/lib/AuthProvider';
 import { StatusBadge } from '../../../src/components/StatusBadge';
 import { Button } from '../../../src/components/Button';
+import { TextField } from '../../../src/components/TextField';
 import { colors, radius, spacing } from '../../../src/constants/theme';
-import type { BookingRequest, CeremonyType } from '../../../src/types/database';
+import type { BookingRequest, CeremonyType, RequestContact } from '../../../src/types/database';
 
 type RequestRow = BookingRequest & { ceremony_types: Pick<CeremonyType, 'name'> | null };
 
@@ -15,7 +16,9 @@ export default function PanditRequestDetailScreen() {
   const router = useRouter();
   const { session } = useAuth();
   const [request, setRequest] = useState<RequestRow | null>(null);
-  const [accepting, setAccepting] = useState(false);
+  const [contact, setContact] = useState<RequestContact | null>(null);
+  const [quotedPrice, setQuotedPrice] = useState('');
+  const [submittingQuote, setSubmittingQuote] = useState(false);
 
   const load = async () => {
     const { data } = await supabase
@@ -24,6 +27,17 @@ export default function PanditRequestDetailScreen() {
       .eq('id', id)
       .single();
     setRequest(data as RequestRow);
+
+    // request_contacts only resolves for the accepted pandit once the
+    // request is 'confirmed' — see 0005_commission_pricing.sql's RLS.
+    if (data?.status === 'confirmed') {
+      const { data: contactRow } = await supabase
+        .from('request_contacts')
+        .select('*')
+        .eq('request_id', id)
+        .maybeSingle();
+      setContact(contactRow as RequestContact | null);
+    }
   };
 
   useEffect(() => {
@@ -41,20 +55,26 @@ export default function PanditRequestDetailScreen() {
     };
   }, [id]);
 
-  const accept = async () => {
+  const sendQuote = async () => {
     if (!session) return;
-    setAccepting(true);
+    const price = Number(quotedPrice);
+    if (!price || price <= 0) {
+      Alert.alert('Enter a valid price');
+      return;
+    }
+    setSubmittingQuote(true);
     const { data, error } = await supabase.rpc('accept_request', {
       req_id: id,
       pandit: session.user.id,
+      p_quoted_price: price,
     });
-    setAccepting(false);
+    setSubmittingQuote(false);
     if (error) {
       Alert.alert('Error', error.message);
       return;
     }
     if (!data || data.length === 0) {
-      Alert.alert('Already taken', 'Another pandit already accepted this request.');
+      Alert.alert('Already taken', 'Another pandit already sent a quote for this request.');
       load();
       return;
     }
@@ -100,15 +120,37 @@ export default function PanditRequestDetailScreen() {
       ) : null}
 
       {request.status === 'pending' ? (
-        <Button title="Accept request" onPress={accept} loading={accepting} style={{ marginTop: spacing.lg }} />
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Send a price quote</Text>
+          <TextField placeholder="e.g. 5000" keyboardType="number-pad" value={quotedPrice} onChangeText={setQuotedPrice} />
+          <Text style={styles.infoText}>
+            The seeker pays a 10% commission to confirm; the rest is settled with you directly after the ceremony.
+          </Text>
+          <Button title="Send quote" onPress={sendQuote} loading={submittingQuote} style={{ marginTop: spacing.sm }} />
+        </View>
       ) : null}
 
-      {request.status === 'accepted' && isMine ? (
+      {request.status === 'quoted' && isMine ? (
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>You accepted this request</Text>
+          <Text style={styles.infoTitle}>Quote sent</Text>
+          <Text style={styles.quotePrice}>₹{request.quoted_price}</Text>
+          <Text style={styles.infoText}>Waiting for the seeker to accept and pay the commission.</Text>
+        </View>
+      ) : null}
+
+      {request.status === 'quoted' && !isMine ? (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoText}>Another pandit already sent a quote for this request.</Text>
+        </View>
+      ) : null}
+
+      {request.status === 'confirmed' && isMine && contact ? (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Booking confirmed 🎉</Text>
+          <Text style={styles.value}>{contact.contact_name}</Text>
           <Button
-            title={`Call ${request.contact_phone}`}
-            onPress={() => Linking.openURL(`tel:${request.contact_phone}`)}
+            title={`Call ${contact.contact_phone}`}
+            onPress={() => Linking.openURL(`tel:${contact.contact_phone}`)}
             style={{ marginTop: spacing.sm }}
           />
           <Button
@@ -120,9 +162,9 @@ export default function PanditRequestDetailScreen() {
         </View>
       ) : null}
 
-      {request.status === 'accepted' && !isMine ? (
+      {request.status === 'confirmed' && !isMine ? (
         <View style={styles.infoCard}>
-          <Text style={styles.infoText}>Another pandit already accepted this request.</Text>
+          <Text style={styles.infoText}>Another pandit's booking was confirmed for this request.</Text>
         </View>
       ) : null}
     </ScrollView>
@@ -137,6 +179,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: spacing.md },
   label: { fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', marginBottom: 2 },
   value: { fontSize: 16, color: colors.text },
+  quotePrice: { fontSize: 26, fontWeight: '700', color: colors.text },
   infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
@@ -145,6 +188,6 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     marginTop: spacing.md,
   },
-  infoText: { color: colors.textMuted, lineHeight: 20 },
-  infoTitle: { fontSize: 16, fontWeight: '700', color: colors.success },
+  infoText: { color: colors.textMuted, lineHeight: 20, marginTop: spacing.xs },
+  infoTitle: { fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
 });

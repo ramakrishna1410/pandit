@@ -4,7 +4,8 @@ import type { RequestStatus } from '../types/database';
 
 const LABELS: Record<RequestStatus, string> = {
   pending: 'Pending',
-  accepted: 'Accepted',
+  quoted: 'Quote received',
+  confirmed: 'Confirmed',
   cancelled: 'Cancelled',
   expired: 'Expired',
   completed: 'Completed',
@@ -12,7 +13,8 @@ const LABELS: Record<RequestStatus, string> = {
 
 const COLORS: Record<RequestStatus, string> = {
   pending: colors.pending,
-  accepted: colors.accepted,
+  quoted: colors.quoted,
+  confirmed: colors.confirmed,
   cancelled: colors.cancelled,
   expired: colors.cancelled,
   completed: colors.primary,

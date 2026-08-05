@@ -1,7 +1,6 @@
-// Triggered by a Supabase Database Webhook on `update` into `requests`,
-// filtered (in the webhook config) to fire only when `status` becomes
-// 'accepted'. Pushes the seeker exactly once, per the product requirement
-// that they're notified only when a pandit accepts.
+// Triggered by trg_notify_quote_ready (see 0006_notify_triggers_pricing.sql)
+// when a request moves pending -> quoted, i.e. a pandit sent a price quote.
+// Pushes the seeker to review and pay the commission to confirm.
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { sendExpoPushNotifications } from '../_shared/expoPush.ts';
 
@@ -16,17 +15,16 @@ interface WebhookPayload {
     seeker_id: string;
     status: string;
     accepted_by: string | null;
+    quoted_price: number | null;
   };
-  old_record: {
-    status: string;
-  };
+  old_record: { status: string };
 }
 
 Deno.serve(async (req) => {
   const payload = (await req.json()) as WebhookPayload;
   const request = payload.record;
 
-  if (request.status !== 'accepted' || payload.old_record.status === 'accepted') {
+  if (request.status !== 'quoted' || payload.old_record.status === 'quoted') {
     return new Response(JSON.stringify({ skipped: true }), { status: 200 });
   }
 
@@ -50,8 +48,8 @@ Deno.serve(async (req) => {
   await sendExpoPushNotifications(
     tokens.map((t) => ({
       to: t.expo_push_token,
-      title: 'A pandit accepted your request!',
-      body: `${pandit?.full_name ?? 'A pandit'} will be in touch shortly.`,
+      title: 'You have a quote!',
+      body: `${pandit?.full_name ?? 'A pandit'} quoted ₹${request.quoted_price}. Review and confirm your booking.`,
       data: { requestId: request.id },
     }))
   );

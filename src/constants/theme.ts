@@ -10,7 +10,8 @@ export const colors = {
   success: '#2E8B57',
   danger: '#C0392B',
   pending: '#E8A33D',
-  accepted: '#2E8B57',
+  quoted: '#3D7DE8',
+  confirmed: '#2E8B57',
   cancelled: '#9AA0A6',
 };
 

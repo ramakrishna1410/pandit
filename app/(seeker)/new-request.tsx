@@ -48,8 +48,6 @@ export default function NewRequestScreen() {
       .insert({
         seeker_id: session.user.id,
         ceremony_type_id: ceremonyTypeId,
-        contact_name: contactName,
-        contact_phone: contactPhone,
         ceremony_date: date.toISOString().slice(0, 10),
         location: `SRID=4326;POINT(${location.lng} ${location.lat})`,
         address_text: addressText || location.label,
@@ -58,9 +56,23 @@ export default function NewRequestScreen() {
       })
       .select('id')
       .single();
-    setSubmitting(false);
+
     if (insertError || !data) {
+      setSubmitting(false);
       setError(insertError?.message ?? 'Could not create request.');
+      return;
+    }
+
+    // Contact info lives in its own table so it can stay hidden from a
+    // pandit until the request is actually confirmed (commission paid) —
+    // see supabase/migrations/0005_commission_pricing.sql.
+    const { error: contactError } = await supabase
+      .from('request_contacts')
+      .insert({ request_id: data.id, contact_name: contactName, contact_phone: contactPhone });
+    setSubmitting(false);
+
+    if (contactError) {
+      setError(contactError.message);
       return;
     }
     router.replace(`/(seeker)/requests/${data.id}`);

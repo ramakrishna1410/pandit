@@ -1,6 +1,8 @@
 export type Role = 'seeker' | 'pandit';
 
-export type RequestStatus = 'pending' | 'accepted' | 'cancelled' | 'expired' | 'completed';
+export type RequestStatus = 'pending' | 'quoted' | 'confirmed' | 'cancelled' | 'expired' | 'completed';
+
+export type PaymentStatus = 'created' | 'paid' | 'failed' | 'refunded';
 
 export type AvailabilityStatus = 'available' | 'busy' | 'blocked';
 
@@ -46,8 +48,6 @@ export interface BookingRequest {
   id: string;
   seeker_id: string;
   ceremony_type_id: number;
-  contact_name: string;
-  contact_phone: string;
   ceremony_date: string;
   lat: number;
   lng: number;
@@ -57,8 +57,34 @@ export interface BookingRequest {
   status: RequestStatus;
   accepted_by: string | null;
   accepted_at: string | null;
+  quoted_price: number | null;
+  quoted_at: string | null;
+  commission_rate: number;
+  commission_amount: number | null;
+  confirmed_at: string | null;
   fallback_notified: boolean;
+  quote_fallback_notified: boolean;
   created_at: string;
+}
+
+export interface RequestContact {
+  request_id: string;
+  contact_name: string;
+  contact_phone: string;
+}
+
+export interface Payment {
+  id: string;
+  request_id: string;
+  seeker_id: string;
+  amount: number;
+  currency: string;
+  gateway: string;
+  gateway_order_id: string | null;
+  gateway_payment_id: string | null;
+  status: PaymentStatus;
+  created_at: string;
+  paid_at: string | null;
 }
 
 export interface NearbyPanditResult {

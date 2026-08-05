@@ -20,6 +20,7 @@ export default function SeekerRequestDetailScreen() {
   const [request, setRequest] = useState<RequestRow | null>(null);
   const [pandit, setPandit] = useState<PanditContact | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [rating, setRating] = useState<Rating | null>(null);
   const [ratingStars, setRatingStars] = useState(0);
   const [reviewText, setReviewText] = useState('');
@@ -33,7 +34,10 @@ export default function SeekerRequestDetailScreen() {
       .single();
     setRequest(data as RequestRow);
 
-    if (data?.accepted_by) {
+    // The pandit's contact (name/phone) only resolves via
+    // public_counterpart_profiles once the request is 'confirmed' — see
+    // that view's RLS in 0005_commission_pricing.sql.
+    if (data?.status === 'confirmed' && data.accepted_by) {
       const { data: panditData } = await supabase
         .from('public_counterpart_profiles')
         .select('*')
@@ -98,6 +102,29 @@ export default function SeekerRequestDetailScreen() {
     ]);
   };
 
+  // Creates the commission payment record and would hand off to Razorpay
+  // checkout. Real gateway integration (and the webhook that calls
+  // confirm_request_payment to flip quoted -> confirmed) is a follow-up —
+  // this wires the DB side of the flow so that piece can be dropped in.
+  const acceptQuoteAndPay = async () => {
+    if (!session || !request) return;
+    setPaying(true);
+    const { error } = await supabase.from('payments').insert({
+      request_id: request.id,
+      seeker_id: session.user.id,
+      amount: request.commission_amount ?? 0,
+    });
+    setPaying(false);
+    if (error) {
+      Alert.alert('Could not start payment', error.message);
+      return;
+    }
+    Alert.alert(
+      'Payment integration pending',
+      'Razorpay checkout isn’t wired up yet — this is where you’d pay the commission to confirm the booking.'
+    );
+  };
+
   if (!request) {
     return (
       <View style={styles.container}>
@@ -131,14 +158,32 @@ export default function SeekerRequestDetailScreen() {
       {request.status === 'pending' ? (
         <View style={styles.infoCard}>
           <Text style={styles.infoText}>
-            We've notified nearby available pandits. You'll be alerted the moment one accepts.
+            We've notified nearby available pandits. You'll be alerted the moment one sends a quote.
           </Text>
         </View>
       ) : null}
 
-      {request.status === 'accepted' && pandit ? (
+      {request.status === 'quoted' ? (
         <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>{pandit.full_name ?? 'Your pandit'} accepted!</Text>
+          <Text style={styles.infoTitle}>Quoted price</Text>
+          <Text style={styles.quotePrice}>₹{request.quoted_price}</Text>
+          <Text style={styles.infoText}>
+            Booking commission (10%): ₹{request.commission_amount} — paid now to confirm.{'\n'}
+            Remaining ₹{(request.quoted_price ?? 0) - (request.commission_amount ?? 0)} is settled directly with the
+            pandit after the ceremony.
+          </Text>
+          <Button
+            title="Accept & pay commission"
+            onPress={acceptQuoteAndPay}
+            loading={paying}
+            style={{ marginTop: spacing.sm }}
+          />
+        </View>
+      ) : null}
+
+      {request.status === 'confirmed' && pandit ? (
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>Booking confirmed with {pandit.full_name ?? 'your pandit'} 🎉</Text>
           {pandit.phone ? (
             <Button
               title={`Call ${pandit.phone}`}
@@ -155,7 +200,7 @@ export default function SeekerRequestDetailScreen() {
         </View>
       ) : null}
 
-      {request.status === 'accepted' && !rating ? (
+      {request.status === 'confirmed' && !rating ? (
         <View style={styles.infoCard}>
           <Text style={styles.infoTitle}>Ceremony done? Rate your pandit</Text>
           <RatingStars value={ratingStars} onChange={setRatingStars} />
@@ -181,7 +226,7 @@ export default function SeekerRequestDetailScreen() {
         </View>
       ) : null}
 
-      {(request.status === 'pending' || request.status === 'accepted') && (
+      {(request.status === 'pending' || request.status === 'quoted' || request.status === 'confirmed') && (
         <Button title="Cancel request" variant="danger" onPress={cancel} loading={cancelling} style={{ marginTop: spacing.lg }} />
       )}
     </ScrollView>
@@ -196,6 +241,7 @@ const styles = StyleSheet.create({
   section: { marginBottom: spacing.md },
   label: { fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', marginBottom: 2 },
   value: { fontSize: 16, color: colors.text },
+  quotePrice: { fontSize: 28, fontWeight: '700', color: colors.text, marginVertical: spacing.xs },
   infoCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.md,
