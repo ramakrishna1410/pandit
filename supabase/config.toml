@@ -1,0 +1,30 @@
+project_id = "pandit"
+
+[api]
+enabled = true
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+# Phone auth (OTP) — configure a real SMS provider (Twilio/MessageBird/Vonage)
+# under Authentication > Providers > Phone in the Supabase dashboard before
+# testing against a real phone number.
+[auth.sms]
+enable_signup = true
+enable_confirmations = true
+
+[edge_runtime]
+enabled = true
+
+[functions.notify-nearby-pandits]
+verify_jwt = false
+
+[functions.notify-seeker-accepted]
+verify_jwt = false
