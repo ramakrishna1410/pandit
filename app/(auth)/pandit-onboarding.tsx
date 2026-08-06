@@ -11,7 +11,7 @@ import { colors, radius, spacing } from '../../src/constants/theme';
 
 export default function PanditOnboardingScreen() {
   const router = useRouter();
-  const { session } = useAuth();
+  const { session, refreshProfile } = useAuth();
   const { ceremonyTypes } = useCeremonyTypes();
 
   const [fullName, setFullName] = useState('');
@@ -84,6 +84,13 @@ export default function PanditOnboardingScreen() {
         ceremony_type_id,
       }))
     );
+
+    // AuthGate (app/_layout.tsx) redirects a pandit back here whenever
+    // AuthProvider's cached panditOnboardingIncomplete is still true --
+    // without this refresh, that stale client-side state would bounce us
+    // straight back after the replace below, even though the save above
+    // already succeeded server-side.
+    await refreshProfile();
 
     setLoading(false);
     router.replace('/(pandit)/feed');
