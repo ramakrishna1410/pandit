@@ -9,14 +9,15 @@ import { registerForPushNotificationsAsync, addNotificationResponseListener } fr
 // back to the phone-entry screen instead of leaving a signed-out user
 // stranded on a now-inaccessible route.
 function AuthGate() {
-  const { session, profile, loading } = useAuth();
+  const { session, profile, panditOnboardingIncomplete, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
   useEffect(() => {
     if (loading) return;
 
-    const inAuthGroup = segments[0] === '(auth)';
+    const current = segments as string[];
+    const inAuthGroup = current[0] === '(auth)';
 
     if (!session) {
       if (!inAuthGroup) router.replace('/(auth)/phone');
@@ -24,15 +25,19 @@ function AuthGate() {
     }
 
     if (!profile?.role) {
-      const current = segments as string[];
       if (current[1] !== 'role-select') router.replace('/(auth)/role-select');
+      return;
+    }
+
+    if (panditOnboardingIncomplete) {
+      if (current[1] !== 'pandit-onboarding') router.replace('/(auth)/pandit-onboarding');
       return;
     }
 
     if (inAuthGroup) {
       router.replace(profile.role === 'pandit' ? '/(pandit)/feed' : '/(seeker)/home');
     }
-  }, [loading, session, profile, segments, router]);
+  }, [loading, session, profile, panditOnboardingIncomplete, segments, router]);
 
   return null;
 }

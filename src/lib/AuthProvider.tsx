@@ -6,6 +6,8 @@ import type { Profile } from '../types/database';
 interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
+  /** A pandit profile exists but hasn't finished onboarding (no base location set yet). */
+  panditOnboardingIncomplete: boolean;
   loading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -16,11 +18,23 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [panditOnboardingIncomplete, setPanditOnboardingIncomplete] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = async (userId: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     setProfile(data as Profile | null);
+
+    if (data?.role === 'pandit') {
+      const { data: panditRow } = await supabase
+        .from('pandit_profiles')
+        .select('base_location')
+        .eq('id', userId)
+        .maybeSingle();
+      setPanditOnboardingIncomplete(!panditRow?.base_location);
+    } else {
+      setPanditOnboardingIncomplete(false);
+    }
   };
 
   const refreshProfile = async () => {
@@ -47,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await loadProfile(newSession.user.id);
       } else {
         setProfile(null);
+        setPanditOnboardingIncomplete(false);
       }
     });
 
@@ -61,7 +76,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, refreshProfile, signOut }}>
+    <AuthContext.Provider
+      value={{ session, profile, panditOnboardingIncomplete, loading, refreshProfile, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   );
