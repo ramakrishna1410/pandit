@@ -34,7 +34,8 @@ function AuthGate() {
       return;
     }
 
-    if (inAuthGroup) {
+    const targetGroup = profile.role === 'pandit' ? '(pandit)' : '(seeker)';
+    if (current[0] !== targetGroup) {
       router.replace(profile.role === 'pandit' ? '/(pandit)/feed' : '/(seeker)/home');
     }
   }, [loading, session, profile, panditOnboardingIncomplete, segments, router]);
