@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Pressable, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
@@ -19,6 +19,9 @@ export default function NewRequestScreen() {
   const [contactName, setContactName] = useState(profile?.full_name ?? '');
   const [contactPhone, setContactPhone] = useState(profile?.phone ?? '');
   const [ceremonyTypeId, setCeremonyTypeId] = useState<number | null>(null);
+  const [priceRange, setPriceRange] = useState<{ min_price: number; max_price: number; pandit_count: number } | null>(
+    null
+  );
   const [date, setDate] = useState<Date>(new Date());
   const [showPicker, setShowPicker] = useState(false);
   const [addressText, setAddressText] = useState('');
@@ -78,6 +81,19 @@ export default function NewRequestScreen() {
     router.replace(`/(seeker)/requests/${data.id}`);
   };
 
+  useEffect(() => {
+    if (!ceremonyTypeId) {
+      setPriceRange(null);
+      return;
+    }
+    supabase
+      .from('ceremony_type_price_ranges')
+      .select('*')
+      .eq('ceremony_type_id', ceremonyTypeId)
+      .maybeSingle()
+      .then(({ data }) => setPriceRange(data as typeof priceRange));
+  }, [ceremonyTypeId]);
+
   const useMyLocation = async () => {
     const result = await captureCurrentLocation();
     if (result) setAddressText(result.label);
@@ -105,6 +121,12 @@ export default function NewRequestScreen() {
           );
         })}
       </View>
+      {priceRange && priceRange.pandit_count > 0 ? (
+        <Text style={styles.priceRange}>
+          Typical price: ₹{priceRange.min_price} – ₹{priceRange.max_price} (from {priceRange.pandit_count} pandit
+          {priceRange.pandit_count === 1 ? '' : 's'} nearby)
+        </Text>
+      ) : null}
 
       <Text style={styles.label}>Ceremony date</Text>
       <Pressable style={styles.dateButton} onPress={() => setShowPicker(true)}>
@@ -160,6 +182,7 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   chipText: { color: colors.text, fontSize: 13 },
   chipTextActive: { color: '#fff' },
+  priceRange: { color: colors.textMuted, fontSize: 13, marginTop: -spacing.sm, marginBottom: spacing.lg },
   dateButton: {
     borderWidth: 1,
     borderColor: colors.border,

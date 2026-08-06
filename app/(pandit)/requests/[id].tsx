@@ -135,6 +135,12 @@ export default function PanditRequestDetailScreen() {
           <Text style={styles.infoTitle}>Quote sent</Text>
           <Text style={styles.quotePrice}>₹{request.quoted_price}</Text>
           <Text style={styles.infoText}>Waiting for the seeker to accept and pay the commission.</Text>
+          <Button
+            title="Open chat"
+            variant="secondary"
+            onPress={() => router.push(`/request/${id}/chat`)}
+            style={{ marginTop: spacing.sm }}
+          />
         </View>
       ) : null}
 

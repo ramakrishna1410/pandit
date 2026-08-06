@@ -67,6 +67,19 @@ export interface BookingRequest {
   created_at: string;
 }
 
+export interface PanditCeremonyType {
+  pandit_id: string;
+  ceremony_type_id: number;
+  price: number | null;
+}
+
+export interface CeremonyTypePriceRange {
+  ceremony_type_id: number;
+  min_price: number | null;
+  max_price: number | null;
+  pandit_count: number;
+}
+
 export interface RequestContact {
   request_id: string;
   contact_name: string;

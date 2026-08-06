@@ -19,6 +19,7 @@ export default function PanditOnboardingScreen() {
   const [yearsExperience, setYearsExperience] = useState('');
   const [languages, setLanguages] = useState('Hindi, Sanskrit');
   const [selectedTypes, setSelectedTypes] = useState<Set<number>>(new Set());
+  const [prices, setPrices] = useState<Record<number, string>>({});
   const [locationLabel, setLocationLabel] = useState('Not set');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,10 @@ export default function PanditOnboardingScreen() {
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
+  };
+
+  const setPriceFor = (id: number, value: string) => {
+    setPrices((prev) => ({ ...prev, [id]: value }));
   };
 
   const captureLocation = async () => {
@@ -58,6 +63,13 @@ export default function PanditOnboardingScreen() {
       setError('Select at least one ceremony you can perform.');
       return;
     }
+    for (const id of selectedTypes) {
+      const p = Number(prices[id]);
+      if (!p || p <= 0) {
+        setError('Enter what you charge for each ceremony you selected.');
+        return;
+      }
+    }
     setLoading(true);
 
     await supabase.from('profiles').update({ full_name: fullName }).eq('id', session.user.id);
@@ -82,6 +94,7 @@ export default function PanditOnboardingScreen() {
       Array.from(selectedTypes).map((ceremony_type_id) => ({
         pandit_id: session.user.id,
         ceremony_type_id,
+        price: Number(prices[ceremony_type_id]),
       }))
     );
 
@@ -125,6 +138,19 @@ export default function PanditOnboardingScreen() {
           );
         })}
       </View>
+
+      {Array.from(selectedTypes).map((id) => {
+        const type = ceremonyTypes.find((t) => t.id === id);
+        return (
+          <TextField
+            key={id}
+            label={`What do you charge for ${type?.name ?? 'this ceremony'}? (₹)`}
+            value={prices[id] ?? ''}
+            onChangeText={(v) => setPriceFor(id, v)}
+            keyboardType="number-pad"
+          />
+        );
+      })}
 
       <Text style={styles.label}>Base location</Text>
       <Text style={styles.locationLabel}>{locationLabel}</Text>

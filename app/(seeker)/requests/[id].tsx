@@ -178,6 +178,12 @@ export default function SeekerRequestDetailScreen() {
             loading={paying}
             style={{ marginTop: spacing.sm }}
           />
+          <Button
+            title="Ask the pandit a question"
+            variant="secondary"
+            onPress={() => router.push(`/request/${id}/chat`)}
+            style={{ marginTop: spacing.sm }}
+          />
         </View>
       ) : null}
 
