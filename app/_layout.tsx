@@ -1,8 +1,41 @@
 import { useEffect, useRef } from 'react';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../src/lib/AuthProvider';
 import { registerForPushNotificationsAsync, addNotificationResponseListener } from '../src/lib/push';
+
+// Watches session/role from anywhere in the app (not just the initial '/'
+// screen) so that e.g. signing out while deep in a tab actually navigates
+// back to the phone-entry screen instead of leaving a signed-out user
+// stranded on a now-inaccessible route.
+function AuthGate() {
+  const { session, profile, loading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return;
+
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!session) {
+      if (!inAuthGroup) router.replace('/(auth)/phone');
+      return;
+    }
+
+    if (!profile?.role) {
+      const current = segments as string[];
+      if (current[1] !== 'role-select') router.replace('/(auth)/role-select');
+      return;
+    }
+
+    if (inAuthGroup) {
+      router.replace(profile.role === 'pandit' ? '/(pandit)/feed' : '/(seeker)/home');
+    }
+  }, [loading, session, profile, segments, router]);
+
+  return null;
+}
 
 function NotificationRouter() {
   const router = useRouter();
@@ -44,6 +77,7 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style="dark" />
+      <AuthGate />
       <NotificationRouter />
       <Stack screenOptions={{ headerShown: false }} />
     </AuthProvider>
