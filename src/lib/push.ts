@@ -1,21 +1,31 @@
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import Constants from 'expo-constants';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+// Expo Go on Android/iOS dropped support for remote push notifications in
+// SDK 53+ — calling almost any expo-notifications API there (including just
+// setNotificationHandler at import time) throws and crashes the whole app.
+// Everything in this module becomes a no-op under Expo Go; push only works
+// in a real dev/production build, which is expected and documented in the
+// README.
+export const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+if (!isExpoGo) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function registerForPushNotificationsAsync(profileId: string): Promise<string | null> {
-  if (!Device.isDevice) {
+  if (isExpoGo || !Device.isDevice) {
     return null;
   }
 

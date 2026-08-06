@@ -3,7 +3,7 @@ import { Stack, useRouter } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../src/lib/AuthProvider';
-import { registerForPushNotificationsAsync, extractRequestIdFromNotification } from '../src/lib/push';
+import { registerForPushNotificationsAsync, extractRequestIdFromNotification, isExpoGo } from '../src/lib/push';
 
 function NotificationRouter() {
   const router = useRouter();
@@ -20,6 +20,9 @@ function NotificationRouter() {
   }, [profile?.id]);
 
   useEffect(() => {
+    // expo-notifications listener APIs also throw under Expo Go (SDK 53+
+    // dropped remote push there) — see src/lib/push.ts.
+    if (isExpoGo) return;
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const requestId = extractRequestIdFromNotification(response);
       if (!requestId || !profile?.role) return;
